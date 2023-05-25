@@ -13,7 +13,11 @@ public class Course implements Comparable<Course> {
     public Course() {
 
     }
-
+    public Course(int idCourse, String s, String title) {
+        this.id = idCourse;
+        this.informationToBeLearned = s;
+        this.title = title;
+    }
     public Course(int cid) {
         this.id = cid;
     }

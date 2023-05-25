@@ -1,25 +1,33 @@
 package DB;
-import java.sql.DriverManager;
-import java.sql.Connection;
-import java.sql.Statement;
-import java.sql.ResultSet;
+import java.sql.*;
+
 public class DBConnection {
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/javasomething?useSSL=false";
+    private static final String USER = "root";
+    private static final String PASSWORD = "root";
+    private static Connection databaseConnection;
+    private DBConnection() {
+    }
 
-    public static void main(String[] args) {
-
+    public static Connection getDatabaseConnection() {
         try {
-            Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/javasomething", "root", "root");
-
-            Statement statement = connection.createStatement();
-
-            ResultSet resultSet = statement.executeQuery("select * from people");
-
-            while (resultSet.next()) {
-                System.out.println(resultSet.getString("firstname"));
+            if (databaseConnection == null || databaseConnection.isClosed()) {
+                databaseConnection = DriverManager.getConnection(DB_URL, USER, PASSWORD);
             }
-        } catch( Exception e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
+        return databaseConnection;
+    }
 
+    public static void closeDatabaseConnection() {
+        try {
+            if (databaseConnection != null && !databaseConnection.isClosed()) {
+                databaseConnection.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }
+
