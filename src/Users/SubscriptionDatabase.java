@@ -1,20 +1,20 @@
 package Users;
 
+import DB.DBConnection;
+
 import java.sql.*;
 
 public class SubscriptionDatabase {
     private Connection connection;
     private static SubscriptionDatabase instance = null;
-    private SubscriptionDatabase(Connection c) {
-        this.connection = c;
-    }
-    public void createConnection(Connection connection)
-    {
-        if(instance == null)
-            instance = new SubscriptionDatabase(connection);
-        return;
+    private SubscriptionDatabase() {
+        this.connection = DBConnection.getDatabaseConnection();
     }
     static public SubscriptionDatabase getInstance(){
+        if (instance == null)
+        {
+            instance = new SubscriptionDatabase();
+        }
         return instance;
     }
 
@@ -59,7 +59,9 @@ public class SubscriptionDatabase {
         {
             PreparedStatement preparedStatement = connection.prepareStatement(insertSQL);
             preparedStatement.setInt(1, subscriptionToInsert.getUserId());
-            preparedStatement.setDate(2, (Date) subscriptionToInsert.getActivationDate());
+            java.util.Date utilDate = subscriptionToInsert.getActivationDate();
+            java.sql.Date sqlDate = new java.sql.Date(utilDate.getTime());
+            preparedStatement.setDate(2, sqlDate);
             preparedStatement.setInt(3,subscriptionToInsert.getDownloadAccess());
             preparedStatement.setInt(4, subscriptionToInsert.getCommentAccess());
             if(subscriptionToInsert instanceof PremiumSubscription)
@@ -91,18 +93,14 @@ public class SubscriptionDatabase {
         }
     }
 
-    public void SQLUpdateSubscription(int userId, int id, Date activationDate, int downloadAccess, int commentAccess, int currentPoints)
+    public void SQLUpdateSubscriptionPoints(float currentPoints)
     {
-        String updateSQL = "UPDATE subscription SET activationDate=?, downloadAccess=?" +
-                ", commentAccess=?, currentPoints=? WHERE userId=?";
+        String updateSQL = "UPDATE subscription SET currentPoints=?";
+
         try
         {
             PreparedStatement preparedStatement = connection.prepareStatement(updateSQL);
-            preparedStatement.setDate(1,activationDate);
-            preparedStatement.setInt(2,downloadAccess);
-            preparedStatement.setInt(3,commentAccess);
-            preparedStatement.setInt(4,currentPoints);
-            preparedStatement.setInt(5,userId);
+            preparedStatement.setInt(1, (int) currentPoints);
             preparedStatement.executeUpdate();
         }
         catch(Exception e)
@@ -110,6 +108,22 @@ public class SubscriptionDatabase {
             System.out.println(e.toString());
         }
     }
+    public void SQLUpdateSubscriptionPrivileges()
+    {
+        String updateSQL = "UPDATE subscription SET isPremium=?";
+
+        try
+        {
+            PreparedStatement preparedStatement = connection.prepareStatement(updateSQL);
+            preparedStatement.setInt(1, 1);
+            preparedStatement.executeUpdate();
+        }
+        catch(Exception e)
+        {
+            System.out.println(e.toString());
+        }
+    }
+
 
 
 }

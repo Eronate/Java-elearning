@@ -3,6 +3,7 @@ import java.util.*;
 
 import Users.StandardSubscription;
 import Users.Subscription;
+import Users.SubscriptionDatabase;
 import Users.User;
 
 import static java.lang.Math.min;
@@ -63,10 +64,16 @@ public class Quiz {
         float pointsEarned = ((float)correctCount / totalQuestions) * pointsWorth;
         System.out.println("You've earned " + pointsEarned  + " points! \n");
         Subscription currentUserSubscription = u.getSubscription();
-        if (currentUserSubscription instanceof StandardSubscription)
+        if (currentUserSubscription instanceof StandardSubscription) {
             ((StandardSubscription) currentUserSubscription).
                     setCurrentPoints(((StandardSubscription) currentUserSubscription).
                             getCurrentPoints() + pointsEarned);
+            SubscriptionDatabase sdb = SubscriptionDatabase.getInstance();
+            sdb.SQLUpdateSubscriptionPoints(((StandardSubscription) currentUserSubscription).getCurrentPoints());
+        }
+
+        SubscriptionDatabase sdb = SubscriptionDatabase.getInstance();
+
         usersCompleted.add(u);
         return;
     }

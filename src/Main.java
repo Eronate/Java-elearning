@@ -1,18 +1,41 @@
 import Users.UserDatabase;
 import Suita.*;
 import Users.*;
+import oracle.jdbc.proxy.annotation.Pre;
 import oracle.sql.BOOLEAN;
 
 import java.util.*;
 
 public class Main {
     public static void main(String[] args) {
-        Service service = new Service();
+        Service service = Service.getInstance();
         User currentUser = null;
-        Service.populateCourses();
+
         UserDatabase udb = UserDatabase.getInstance();
         CourseDatabase cdb = CourseDatabase.getInstance();
+        SubscriptionDatabase sdb = SubscriptionDatabase.getInstance();
+        Service.populateCourses();
 
+        udb.SQLReadUsersFromDatabaseAndSaveLocally();
+        for(User u: udb.getAllUsers())
+            u.setSubscription(sdb.SQLReadSubscriptionFromDatabase(u.getUserId()));
+        cdb.PopulateEnrolledAndCompleted();
+
+        List<String> questions = new ArrayList<>();
+        questions.add("What is React?");
+        questions.add("What is JSX?");
+        questions.add("What is the virtual DOM?");
+
+        // Create a list of corresponding answers
+        List<String> answers = new ArrayList<>();
+        answers.add("javascript");
+        answers.add("syntax");
+        answers.add("abstraction");
+
+        Quiz q = Quiz.createQuiz(questions,answers);
+        q.setCourseId(3);
+        if(cdb.getCourseById(3) instanceof PremiumCourse)
+            ((PremiumCourse)cdb.getCourseById(3)).setCourseQuiz(q);
         while(Boolean.TRUE)
         {
             Scanner scanner = new Scanner(System.in);
@@ -27,7 +50,7 @@ public class Main {
             System.out.println("7. Upgrade my subscription.");
             System.out.println("8. Show me how many points I have.");
             System.out.println("9. Make me a teacher.");
-            System.out.println("");
+            System.out.println("10. Log out.");
             int choice;
             if(scanner.hasNextInt())
                 choice = scanner.nextInt();
@@ -38,22 +61,38 @@ public class Main {
             }
             switch(choice){
                 case 1:
-                    service.createUser();
+                    if(currentUser == null)
+                    {
+                        User userC = service.createUser();
+                        udb.SQLInjectUserIntoDatabase(userC);
+                        Subscription subuserC = userC.getSubscription();
+                        sdb.SQLInjectSubscriptionIntoDatabase(subuserC);
+                    }
+                    else
+                    {
+                        System.out.println("You are already logged in.");
+                    }
                     break;
                 case 2:
                 {
-                    System.out.println("Enter an username:");
-                    Scanner scanner2 = new Scanner(System.in);
-                    String uname = scanner2.nextLine();
-                    System.out.println("Enter a passsword:");
-                    String password = scanner2.nextLine();
-                    User u = service.tryToLogIn(uname,password);
-                    if(u != null) {
-                        System.out.println("You have logged in.");
-                        currentUser = u;
+                    if(currentUser == null) {
+                        System.out.println("Enter an username:");
+                        Scanner scanner2 = new Scanner(System.in);
+                        String uname = scanner2.nextLine();
+                        System.out.println("Enter a passsword:");
+                        String password = scanner2.nextLine();
+                        User u = service.tryToLogIn(uname, password);
+                        if (u != null) {
+                            System.out.println("You have logged in.");
+                            currentUser = u;
+                        } else
+                            System.out.println("Wrong credentials.");
+                        break;
                     }
                     else
-                        System.out.println("Wrong credentials.");
+                    {
+                        System.out.println("You are already logged in.");
+                    }
                     break;
                 }
                 case 3:
@@ -87,7 +126,10 @@ public class Main {
                             break;
                         }
 
-                        Boolean hasEnrolled = courseSought.getUsersEnrolled().contains(currentUser);
+                        Boolean hasEnrolled = false;
+                        for (User u : courseSought.getUsersEnrolled())
+                            hasEnrolled = hasEnrolled || (u.getUserId() == currentUser.getUserId());
+
                         Boolean isPremium = (courseSought instanceof PremiumCourse);
 
                         if(isPremium && !(currentUser.getSubscription() instanceof PremiumSubscription))
@@ -99,6 +141,8 @@ public class Main {
                         if(courseSought != null && !hasEnrolled)
                         {
                             service.enrollUserIntoCourse(currentUser, courseSought);
+                            cdb.SQLInjectEnrolled(currentUser.getUserId(), courseSought.getId());
+
                             System.out.println("You have been enrolled in the course.");
                             courseSought.print();
                             System.out.println("Do you want to set the course as completed? 1 (Yes) / 2 (No).");
@@ -113,7 +157,10 @@ public class Main {
                                 break;
                             }
                             if(sth2 == 1)
+                            {
                                 service.completeTheCourse(currentUser, courseSought);
+                                cdb.SQLInjectCompleted(currentUser.getUserId(), courseSought.getId());
+                            }
                             else
                             {
                                 System.out.println("Okay.");
@@ -152,8 +199,6 @@ public class Main {
                             else System.out.println("");
                         }
 
-
-
                         System.out.println("Press the index of the course you want to select or any other input to exit: \n");
                         Scanner scanner4 = new Scanner(System.in);
 
@@ -165,8 +210,13 @@ public class Main {
                         }
                         Course courseSought = cdb.getCourseById(sth);
 
-                        Boolean hasCompleted = courseSought.getUsersCompleted().contains(currentUser);
-                        Boolean hasEnrolled = courseSought.getUsersEnrolled().contains(currentUser);
+                        Boolean hasCompleted = false;
+                        for (User u : courseSought.getUsersCompleted())
+                            hasCompleted = hasCompleted || (u.getUserId() == currentUser.getUserId());
+                        Boolean hasEnrolled = false;
+                        for (User u : courseSought.getUsersEnrolled())
+                            hasEnrolled = hasEnrolled || (u.getUserId() == currentUser.getUserId());
+
                         Boolean isPremium = (courseSought instanceof PremiumCourse);
                         Boolean isTeacher = (currentUser instanceof Teacher);
                         //The user could type in an id of a course that he isn't even enrolled in.
@@ -213,7 +263,10 @@ public class Main {
                                     break;
                                 }
                                 if (sth2 == 1)
+                                {
                                     service.completeTheCourse(currentUser, courseSought);
+                                    cdb.SQLInjectCompleted(currentUser.getUserId(), courseSought.getId());
+                                }
                                 else {
                                     System.out.println("Okay.");
                                 }
@@ -265,7 +318,12 @@ public class Main {
                             System.out.println("The course doesn't exist.");
                         Boolean isPremium = (courseSought instanceof PremiumCourse);
 
-                        if (!courseSought.getUsersCompleted().contains(currentUser))
+
+                        Boolean hasCompleted = false;
+                        for (User u : courseSought.getUsersEnrolled())
+                            hasCompleted = hasCompleted || (u.getUserId() == currentUser.getUserId());
+
+                        if (!hasCompleted)
                         {
                             System.out.println("You haven't completed that course.");
                             break;
@@ -307,6 +365,7 @@ public class Main {
                     if(currentUser != null) {
                         currentUser.setSubscription(PremiumSubscription.upgradeSubscription((StandardSubscription) currentUser.getSubscription()));
                         System.out.println("Your subscription has been upgraded.");
+                        sdb.SQLUpdateSubscriptionPrivileges();
                     }
                     else
                     {
@@ -333,6 +392,7 @@ public class Main {
                     if(currentUser != null)
                     {
                         Teacher teacher = new Teacher(currentUser);
+                        udb.SQLUpdateUserToTeacher(currentUser.getUserId());
                         udb.removeUser(currentUser);
                         udb.addExistingUser(teacher);
                         currentUser = teacher;
@@ -344,6 +404,16 @@ public class Main {
                         System.out.println("You aren't logged in.");
                         break;
                     }
+                }
+                case 10:
+                {
+                    if(currentUser == null){
+                        System.out.println("You are already logged out.");
+                        break;
+                    }
+                    currentUser = null;
+                    System.out.println("You have successfully logged out.");
+                    break;
                 }
             }
         }

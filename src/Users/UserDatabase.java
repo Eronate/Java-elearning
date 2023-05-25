@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import static Users.User.read;
+
+import DB.DBConnection;
 import Users.User;
 import com.mysql.cj.x.protobuf.MysqlxPrepare;
 
@@ -15,21 +17,19 @@ public final class UserDatabase {
     private static UserDatabase instance = null;
     private List<User> allUsers = new ArrayList<User>();
     private static int userCount = 0;
-    private UserDatabase(Connection c) {
-        this.connection = c;
+    private UserDatabase() {
+        this.connection = DBConnection.getDatabaseConnection();
     }
     //First create the connection between the class and the real db
-    public void createConnection(Connection connection)
-    {
-        if(instance == null)
-            instance = new UserDatabase(connection);
-        return;
-    }
+
     static public UserDatabase getInstance(){
+        if(instance == null)
+            instance = new UserDatabase();
         return instance;
     }
     public User createUserWithSubscription()
     {
+        userCount = getAllUsers().size();
         User newUser = new User(++userCount);
         Scanner scanner = new Scanner(System.in);
         read(scanner, newUser);
